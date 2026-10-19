@@ -1,5 +1,5 @@
 # 🌙 Lunari
-
+![showcase](/public/Lunari-thumbnail.jpg)
 > A lightweight, static-first blogging framework for the personal, moonlit web.
 
 Lunari is a static-first blogging template built with [Astro](https://astro.build) and centered around Markdown. It is crafted for writers, thinkers, and creators who want a serene personal sanctuary on the web without unnecessary complexity, bulky client scripts, or account walls.

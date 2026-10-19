@@ -1,0 +1,385 @@
+---
+interface Props {
+	postSlug: string;
+	apiBaseUrl: string;
+}
+
+const { postSlug, apiBaseUrl } = Astro.props;
+---
+
+<section class="comments" data-comments data-slug={postSlug} data-api-base={apiBaseUrl}>
+	<div class="comments-header">
+		<h2>Comments</h2>
+		<div class="reactions" aria-label="Post reactions">
+			<button type="button" data-reaction="like" aria-label="Like this post">
+				<span aria-hidden="true">Like</span>
+				<span data-like-count>0</span>
+			</button>
+			<button type="button" data-reaction="dislike" aria-label="Dislike this post">
+				<span aria-hidden="true">Dislike</span>
+				<span data-dislike-count>0</span>
+			</button>
+		</div>
+	</div>
+
+	<form class="comment-form" data-comment-form>
+		<label>
+			Name
+			<input name="name" type="text" autocomplete="name" maxlength="80" required />
+		</label>
+		<label>
+			Comment
+			<textarea name="comment" rows="4" maxlength="1000" required></textarea>
+		</label>
+		<button type="submit">Post comment</button>
+		<p class="form-status" data-form-status role="status" aria-live="polite"></p>
+	</form>
+
+	<div class="comment-list" data-comment-list></div>
+</section>
+
+<script is:inline>
+	const sections = document.querySelectorAll('[data-comments]');
+
+	const formatDate = (value) =>
+		new Intl.DateTimeFormat('en', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		}).format(new Date(value));
+
+	function renderComments(list, comments, ownCommentId, handlers) {
+		list.replaceChildren();
+
+		if (!comments.length) {
+			const empty = document.createElement('p');
+			empty.className = 'empty-comments';
+			empty.textContent = 'No comments yet.';
+			list.append(empty);
+			return;
+		}
+
+		for (const item of comments) {
+			const article = document.createElement('article');
+			article.className = 'comment';
+
+			const header = document.createElement('div');
+			header.className = 'comment-meta';
+
+			const name = document.createElement('strong');
+			name.textContent = item.name;
+
+			const date = document.createElement('time');
+			date.dateTime = item.createdAt;
+			date.textContent = formatDate(item.createdAt);
+
+			const body = document.createElement('p');
+			body.textContent = item.comment;
+
+			header.append(name, date);
+			if (item.updatedAt) {
+				const edited = document.createElement('span');
+				edited.textContent = 'Edited';
+				header.append(edited);
+			}
+			article.append(header, body);
+
+			if (item.id === ownCommentId) {
+				const actions = document.createElement('div');
+				actions.className = 'comment-actions';
+
+				const edit = document.createElement('button');
+				edit.type = 'button';
+				edit.textContent = 'Edit';
+				edit.addEventListener('click', () => handlers.onEdit(item));
+
+				const remove = document.createElement('button');
+				remove.type = 'button';
+				remove.textContent = 'Delete';
+				remove.addEventListener('click', () => handlers.onDelete(item));
+
+				actions.append(edit, remove);
+				article.append(actions);
+			}
+
+			list.append(article);
+		}
+	}
+
+	const reactionTypes = ['like', 'dislike'];
+
+	function getClientId() {
+		try {
+			const stored = localStorage.getItem('blog:client-id');
+			if (stored) {
+				return stored;
+			}
+
+			const nextId = crypto.randomUUID();
+			localStorage.setItem('blog:client-id', nextId);
+			return nextId;
+		} catch {
+			return crypto.randomUUID();
+		}
+	}
+
+	function getOwnCommentKey(slug) {
+		return `blog:comment:${slug}`;
+	}
+
+	function getOwnCommentId(slug) {
+		try {
+			return localStorage.getItem(getOwnCommentKey(slug));
+		} catch {
+			return null;
+		}
+	}
+
+	function storeOwnCommentId(slug, commentId) {
+		try {
+			localStorage.setItem(getOwnCommentKey(slug), commentId);
+		} catch {
+			// Ignore storage failures; the API still enforces ownership.
+		}
+	}
+
+	function clearOwnCommentId(slug) {
+		try {
+			localStorage.removeItem(getOwnCommentKey(slug));
+		} catch {
+			// Ignore storage failures; the visible page state is still updated.
+		}
+	}
+
+	function getReactionKey(slug) {
+		return `blog:reaction:${slug}`;
+	}
+
+	function getStoredReaction(slug) {
+		try {
+			const stored = JSON.parse(localStorage.getItem(getReactionKey(slug)) ?? '{}');
+			const reaction = reactionTypes.includes(stored.reaction) ? stored.reaction : null;
+			return {
+				reaction,
+				submitted: {
+					like: Boolean(stored.submitted?.like),
+					dislike: Boolean(stored.submitted?.dislike),
+				},
+			};
+		} catch {
+			return {
+				reaction: null,
+				submitted: { like: false, dislike: false },
+			};
+		}
+	}
+
+	function storeReaction(slug, state) {
+		try {
+			localStorage.setItem(getReactionKey(slug), JSON.stringify(state));
+		} catch {
+			// Ignore storage failures so reaction buttons still work for this page view.
+		}
+	}
+
+	function renderReactions(section, reactions, state) {
+		section.querySelector('[data-like-count]').textContent = String(reactions.likes ?? 0);
+		section.querySelector('[data-dislike-count]').textContent = String(reactions.dislikes ?? 0);
+
+		for (const button of section.querySelectorAll('[data-reaction]')) {
+			const selected = button.dataset.reaction === state.reaction;
+			button.classList.toggle('is-active', selected);
+			button.setAttribute('aria-pressed', String(selected));
+		}
+	}
+
+	async function requestJson(url, options) {
+		const response = await fetch(url, {
+			...options,
+			headers: {
+				'content-type': 'application/json',
+				...(options?.headers ?? {}),
+			},
+		});
+
+		const data = await response.json();
+		if (!response.ok) {
+			const error = new Error(data.error || 'Request failed.');
+			error.data = data;
+			throw error;
+		}
+
+		return data;
+	}
+
+	for (const section of sections) {
+		const apiBase = section.dataset.apiBase?.replace(/\/$/, '');
+		const slug = encodeURIComponent(section.dataset.slug);
+		const list = section.querySelector('[data-comment-list]');
+		const form = section.querySelector('[data-comment-form]');
+		const nameInput = form.elements.name;
+		const commentInput = form.elements.comment;
+		const submit = form.querySelector('button[type="submit"]');
+		const status = section.querySelector('[data-form-status]');
+		const commentsUrl = `${apiBase}/posts/${slug}/comments`;
+		const reactionsUrl = `${apiBase}/posts/${slug}/reactions`;
+		const reactionButtons = Array.from(section.querySelectorAll('[data-reaction]'));
+		const clientId = getClientId();
+		let comments = [];
+		let ownCommentId = getOwnCommentId(section.dataset.slug);
+		let reactions = { likes: 0, dislikes: 0 };
+		let reactionState = getStoredReaction(section.dataset.slug);
+
+		const renderCommentList = () => {
+			renderComments(list, comments, ownCommentId, {
+				onEdit(comment) {
+					nameInput.value = comment.name;
+					commentInput.value = comment.comment;
+					submit.textContent = 'Update comment';
+					status.textContent = '';
+					commentInput.focus();
+				},
+				async onDelete(comment) {
+					status.textContent = '';
+					submit.disabled = true;
+
+					try {
+						const data = await requestJson(`${commentsUrl}/${encodeURIComponent(comment.id)}`, {
+							method: 'DELETE',
+							body: JSON.stringify({ clientId }),
+						});
+						comments = data.comments ?? [];
+						ownCommentId = null;
+						clearOwnCommentId(section.dataset.slug);
+						form.reset();
+						submit.textContent = 'Post comment';
+						renderCommentList();
+						status.textContent = 'Comment deleted.';
+					} catch (error) {
+						status.textContent = error.message;
+					} finally {
+						submit.disabled = false;
+					}
+				},
+			});
+		};
+
+		renderReactions(section, reactions, reactionState);
+
+		requestJson(commentsUrl)
+			.then((data) => {
+				reactions = data.reactions ?? {};
+				comments = data.comments ?? [];
+				if (ownCommentId && !comments.some((comment) => comment.id === ownCommentId)) {
+					ownCommentId = null;
+					clearOwnCommentId(section.dataset.slug);
+				}
+				const ownComment = comments.find((comment) => comment.id === ownCommentId);
+				if (ownComment) {
+					nameInput.value = ownComment.name;
+					commentInput.value = ownComment.comment;
+					submit.textContent = 'Update comment';
+				}
+				renderCommentList();
+				renderReactions(section, reactions, reactionState);
+			})
+			.catch(() => {
+				status.textContent = 'Comments are unavailable right now.';
+			});
+
+		for (const button of reactionButtons) {
+			button.addEventListener('click', async () => {
+				const type = button.dataset.reaction;
+
+				for (const reactionButton of reactionButtons) {
+					reactionButton.disabled = true;
+				}
+				try {
+					if (reactionState.reaction === type) {
+						const data = await requestJson(reactionsUrl, {
+							method: 'DELETE',
+							body: JSON.stringify({ type }),
+						});
+						reactions = data.reactions ?? reactions;
+						reactionState = { ...reactionState, reaction: null };
+					} else {
+						if (reactionState.reaction) {
+							const data = await requestJson(reactionsUrl, {
+								method: 'DELETE',
+								body: JSON.stringify({ type: reactionState.reaction }),
+							});
+							reactions = data.reactions ?? reactions;
+						}
+
+						const data = await requestJson(reactionsUrl, {
+							method: 'POST',
+							body: JSON.stringify({ type }),
+						});
+						reactions = data.reactions ?? reactions;
+						reactionState = {
+							reaction: type,
+							submitted: {
+								...reactionState.submitted,
+								[type]: true,
+							},
+						};
+					}
+
+					storeReaction(section.dataset.slug, reactionState);
+					renderReactions(section, reactions, reactionState);
+				} finally {
+					for (const reactionButton of reactionButtons) {
+						reactionButton.disabled = false;
+					}
+				}
+			});
+		}
+
+		form.addEventListener('submit', async (event) => {
+			event.preventDefault();
+			const formData = new FormData(form);
+			const isEditing = Boolean(ownCommentId);
+			status.textContent = '';
+			submit.disabled = true;
+
+			try {
+				const data = await requestJson(
+					isEditing ? `${commentsUrl}/${encodeURIComponent(ownCommentId)}` : commentsUrl,
+					{
+						method: isEditing ? 'PUT' : 'POST',
+						body: JSON.stringify({
+							clientId,
+							name: formData.get('name'),
+							comment: formData.get('comment'),
+						}),
+					},
+				);
+
+				comments = data.comments ?? [];
+				if (data.comment?.id) {
+					ownCommentId = data.comment.id;
+					storeOwnCommentId(section.dataset.slug, ownCommentId);
+					nameInput.value = data.comment.name;
+					commentInput.value = data.comment.comment;
+				}
+
+				renderCommentList();
+				submit.textContent = 'Update comment';
+				status.textContent = isEditing ? 'Comment updated.' : 'Comment posted.';
+			} catch (error) {
+				if (error.data?.comment?.id) {
+					comments = error.data.comments ?? comments;
+					ownCommentId = error.data.comment.id;
+					storeOwnCommentId(section.dataset.slug, ownCommentId);
+					nameInput.value = error.data.comment.name;
+					commentInput.value = error.data.comment.comment;
+					submit.textContent = 'Update comment';
+					renderCommentList();
+				}
+				status.textContent = error.message;
+			} finally {
+				submit.disabled = false;
+			}
+		});
+	}
+</script>

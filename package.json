@@ -1,0 +1,21 @@
+{
+  "name": "lunari",
+  "description": "A lightweight, static-first blogging framework built with Astro",
+  "type": "module",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/rss": "^4.0.18",
+    "@astrojs/sitemap": "^3.7.3",
+    "astro": "^6.4.4",
+    "astro-robots-txt": "^1.0.0"
+  }
+}

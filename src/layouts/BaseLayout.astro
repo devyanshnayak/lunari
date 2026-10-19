@@ -1,0 +1,120 @@
+---
+import '../styles/global.css';
+
+interface Props {
+	title: string;
+	description?: string;
+	image?: string;
+	pubDate?: Date;
+	updatedDate?: Date;
+	author?: string;
+}
+
+const { 
+	title, 
+	description = 'Lunari — A lightweight, static-first blogging framework', 
+	image = '/Lunari-thumbnail.jpg', 
+	pubDate, 
+	updatedDate,
+	author = 'Lunari'
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://lunari.devyansh.site');
+const imageUrl = new URL(image, Astro.url).toString();
+
+const schemaData = {
+	"@context": "https://schema.org",
+	"@type": pubDate ? "BlogPosting" : "WebSite",
+	"headline": title,
+	"description": description,
+	"image": [imageUrl],
+	"author": [{
+		"@type": "Person",
+		"name": author,
+	}],
+	"publisher": {
+		"@type": "Organization",
+		"name": "Lunari",
+		"logo": {
+			"@type": "ImageObject",
+			"url": new URL('/favicon.png', Astro.url).toString()
+		}
+	},
+	...(pubDate && { "datePublished": pubDate.toISOString() }),
+	...(updatedDate && { "dateModified": updatedDate.toISOString() })
+};
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<!-- Global Metadata -->
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<link rel="icon" type="image/png" href="/favicon.png" />
+		<meta name="generator" content={Astro.generator} />
+
+		<!-- Canonical URL -->
+		<link rel="canonical" href={canonicalURL} />
+
+		<!-- Primary Meta Tags -->
+		<title>{title === 'Lunari' ? 'Lunari — A Moonlit Static-First Blogging Framework' : `${title} | Lunari`}</title>
+		<meta name="title" content={title} />
+		<meta name="description" content={description} />
+
+		<!-- Open Graph / Facebook -->
+		<meta property="og:type" content={pubDate ? "article" : "website"} />
+		<meta property="og:url" content={Astro.url} />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:image" content={imageUrl} />
+
+		<!-- Twitter -->
+		<meta property="twitter:card" content="summary_large_image" />
+		<meta property="twitter:url" content={Astro.url} />
+		<meta property="twitter:title" content={title} />
+		<meta property="twitter:description" content={description} />
+		<meta property="twitter:image" content={imageUrl} />
+
+		<!-- JSON-LD Structured Data -->
+		<script type="application/ld+json" is:inline set:html={JSON.stringify(schemaData)} />
+
+		<!-- Google Fonts -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	</head>
+	<body>
+		<nav>
+			<div class="nav-container">
+				<a href="/" class="site-brand">
+					<img src="/favicon.png" alt="Lunari Logo" class="site-logo" width="38" height="38" />
+					<span class="site-title">Lunari</span>
+				</a>
+				<div class="nav-links">
+					<a href="/">Home</a>
+					<a href="/blog/wellcome">Docs</a>
+					<a href="/rss.xml">RSS</a>
+				</div>
+			</div>
+		</nav>
+		<main>
+			<slot />
+		</main>
+		<footer>
+			<div class="footer-container">
+				<div class="footer-brand">
+					<img src="/favicon.png" alt="Lunari Logo" class="footer-logo" width="28" height="28" />
+					<span class="footer-title">Lunari</span>
+				</div>
+				<p class="footer-tagline">A lightweight, static-first blogging framework for the personal web.</p>
+				<div class="footer-links">
+					<a href="/">Home</a>
+					<a href="/blog/wellcome">Documentation</a>
+					<a href="/rss.xml">RSS Feed</a>
+				</div>
+				<p class="footer-copy">&copy; {new Date().getFullYear()} Lunari. Built with <a href="https://astro.build" target="_blank" rel="noopener">Astro</a>.</p>
+			</div>
+		</footer>
+	</body>
+</html>

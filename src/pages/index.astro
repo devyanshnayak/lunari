@@ -1,0 +1,246 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const posts = (await getCollection('blog')).sort(
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+---
+
+<BaseLayout title="Lunari" description="A lightweight, static-first blogging framework for a personal, moonlit web.">
+	<section class="hero-section">
+		<div class="hero-badge">
+			<span class="star-icon">✦</span>
+			<span>Static-First Blogging Framework</span>
+		</div>
+		<h1 class="hero-title">A Little Corner of the Moonlit Web</h1>
+		<p class="hero-lead">
+			Lunari is a lightweight, static-first blogging framework built with Astro and centered around Markdown.
+			Engineered for blazing speed, effortless SEO tags, privacy-first anonymous commenting, and peaceful writing.
+		</p>
+		<div class="hero-actions">
+			<a href="/blog/wellcome" class="btn btn-primary">Get Started & Docs &rarr;</a>
+			<a href="/rss.xml" class="btn btn-secondary">RSS Feed</a>
+		</div>
+	</section>
+
+	<section class="posts-section">
+		<div class="section-header">
+			<h2>Articles & Updates</h2>
+			<span class="posts-count">{posts.length} {posts.length === 1 ? 'post' : 'posts'}</span>
+		</div>
+
+		{posts.length === 0 ? (
+			<div class="empty-state">
+				<p>No articles published yet. Add a Markdown file to <code>src/content/blog/</code> to get started.</p>
+			</div>
+		) : (
+			<div class="blog-grid">
+				{posts.map((post) => (
+					<article class="blog-card">
+						<a href={`/blog/${post.id}/`} class="card-link">
+							{post.data.heroImage && (
+								<div class="card-image-wrap">
+									<img src={post.data.heroImage} alt={post.data.title} class="card-hero-image" loading="lazy" />
+								</div>
+							)}
+							<div class="card-body">
+								<div class="card-meta">
+									<time datetime={post.data.pubDate.toISOString()}>
+										{post.data.pubDate.toLocaleDateString('en-us', {
+											year: 'numeric',
+											month: 'short',
+											day: 'numeric',
+										})}
+									</time>
+								</div>
+								<h3 class="card-title">{post.data.title}</h3>
+								<p class="card-description">{post.data.description}</p>
+								<span class="card-read-more">Read article &rarr;</span>
+							</div>
+						</a>
+					</article>
+				))}
+			</div>
+		)}
+	</section>
+</BaseLayout>
+
+<style>
+	.hero-section {
+		padding: 3rem 0 3.5rem;
+		text-align: center;
+		max-width: 780px;
+		margin: 0 auto;
+	}
+	.hero-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.35rem 0.95rem;
+		border-radius: 9999px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		background: var(--badge-bg);
+		color: var(--accent-color);
+		border: 1px solid var(--border-color);
+		margin-bottom: 1.5rem;
+		letter-spacing: 0.03em;
+		box-shadow: 0 0 20px rgba(167, 139, 250, 0.15);
+	}
+	.hero-badge .star-icon {
+		font-size: 0.95rem;
+		color: var(--accent-color);
+		filter: drop-shadow(0 0 6px var(--accent-color));
+	}
+	.hero-title {
+		font-size: clamp(2.25rem, 5vw, 3.4rem);
+		line-height: 1.15;
+		margin-bottom: 1.25rem;
+		background: linear-gradient(135deg, var(--heading-color) 40%, var(--accent-color) 100%);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+	}
+	.hero-lead {
+		font-size: clamp(1.05rem, 2vw, 1.2rem);
+		line-height: 1.7;
+		color: var(--text-color);
+		opacity: 0.9;
+		margin-bottom: 2rem;
+	}
+	.hero-actions {
+		display: flex;
+		justify-content: center;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.4rem;
+		border-radius: 10px;
+		font-weight: 600;
+		font-size: 0.95rem;
+		text-decoration: none;
+		transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+	}
+	.btn-primary {
+		background: var(--accent-color);
+		color: #ffffff;
+		box-shadow: 0 4px 18px rgba(167, 139, 250, 0.35);
+	}
+	.btn-primary:hover {
+		opacity: 0.92;
+		transform: translateY(-2px);
+		box-shadow: 0 6px 24px rgba(167, 139, 250, 0.45);
+	}
+	.btn-secondary {
+		background: var(--card-bg);
+		color: var(--text-color);
+		border: 1px solid var(--border-color);
+	}
+	.btn-secondary:hover {
+		border-color: var(--accent-color);
+		color: var(--accent-color);
+		transform: translateY(-2px);
+	}
+	.posts-section {
+		margin-top: 1.5rem;
+	}
+	.section-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin-bottom: 1.75rem;
+		padding-bottom: 0.75rem;
+		border-bottom: 1px solid var(--border-color);
+	}
+	.section-header h2 {
+		margin-bottom: 0;
+		font-size: 1.85rem;
+	}
+	.posts-count {
+		font-size: 0.9rem;
+		color: var(--footer-text);
+		font-weight: 500;
+	}
+	.blog-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.75rem;
+	}
+	.blog-card {
+		background: var(--card-bg);
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		overflow: hidden;
+		transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+	}
+	.blog-card:hover {
+		transform: translateY(-4px);
+		border-color: var(--accent-hover-border);
+		box-shadow: 0 12px 32px -8px rgba(139, 92, 246, 0.22);
+	}
+	.card-link {
+		display: block;
+		text-decoration: none;
+		color: inherit;
+	}
+	.card-image-wrap {
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		max-height: 380px;
+		overflow: hidden;
+		background: #0f1225;
+	}
+	.card-hero-image {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		transition: transform 0.4s ease;
+	}
+	.blog-card:hover .card-hero-image {
+		transform: scale(1.02);
+	}
+	.card-body {
+		padding: 1.75rem;
+	}
+	.card-meta {
+		font-size: 0.85rem;
+		color: var(--footer-text);
+		margin-bottom: 0.5rem;
+	}
+	.card-title {
+		font-size: 1.65rem;
+		margin-bottom: 0.65rem;
+		color: var(--heading-color);
+		transition: color 0.2s ease;
+	}
+	.blog-card:hover .card-title {
+		color: var(--accent-color);
+	}
+	.card-description {
+		color: var(--text-color);
+		opacity: 0.85;
+		line-height: 1.6;
+		margin-bottom: 1.25rem;
+		font-size: 1rem;
+	}
+	.card-read-more {
+		display: inline-flex;
+		align-items: center;
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: var(--accent-color);
+	}
+	.empty-state {
+		text-align: center;
+		padding: 3rem 1.5rem;
+		background: var(--card-bg);
+		border: 1px dashed var(--border-color);
+		border-radius: 12px;
+		color: var(--footer-text);
+	}
+</style>
